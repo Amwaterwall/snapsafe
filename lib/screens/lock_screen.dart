@@ -1,71 +1,134 @@
-// ignore_for_file: unused_import
+// ignore_for_file: unused_import, depend_on_referenced_packages, prefer_final_fields, library_private_types_in_public_api, use_key_in_widget_constructors, prefer_const_constructors_in_immutables, unused_field, unused_element
 
 import 'dart:io';
 import 'package:flutter/material.dart';
-
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart';
-
-import '../services/auth_service.dart';
-import 'home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LockScreen extends StatefulWidget {
+  final String password;
+
+  LockScreen({required this.password});
+
   @override
   _LockScreenState createState() => _LockScreenState();
 }
 
 class _LockScreenState extends State<LockScreen> {
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isUnlocked = false;
   final ImagePicker _picker = ImagePicker();
   List<File> _images = [];
+  static const String _imagesKey = 'images_key';
 
-  // Function to pick an image from gallery or take a new picture
-  Future<void> _pickImage() async {
-    final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+  @override
+  void initState() {
+    super.initState();
+    _loadImages();
+  }
 
-    if (pickedFile != null) {
-      // Save the image to local storage
+  Future<void> _loadImages() async {
+    final prefs = await SharedPreferences.getInstance();
+    final imagePathList = prefs.getStringList(_imagesKey) ?? [];
+    setState(() {
+      _images = imagePathList.map((path) => File(path)).toList();
+    });
+  }
+
+  void _unlockAlbum() {
+    if (_passwordController.text == widget.password) {
       setState(() {
-        _images.add(File(pickedFile.path));
+        _isUnlocked = true;
       });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Incorrect password'),
+      ));
     }
   }
 
-  // Function to store images locally
-  Future<void> _saveImagesLocally() async {
-    final directory = await getApplicationDocumentsDirectory();
-    for (var image in _images) {
-      final fileName = basename(image.path);
-      final newImagePath = '${directory.path}/$fileName';
-      await image.copy(newImagePath);
+  Future<void> _pickImage() async {
+    final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _images.add(File(pickedFile.path));
+      });
+      await _saveImages();
     }
+  }
+
+  Future<void> _saveImages() async {
+    final prefs = await SharedPreferences.getInstance();
+    final imagePathList = _images.map((file) => file.path).toList();
+    await prefs.setStringList(_imagesKey, imagePathList);
+  }
+
+  void _removeImage(int index) async {
+    setState(() {
+      _images.removeAt(index);
+    });
+    await _saveImages();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Snapsafe")),
-      body: Column(
-        children: [
-          ElevatedButton(
-            onPressed: _pickImage,
-            child: Text("Pick an image"),
-          ),
-          Expanded(
-            child: GridView.builder(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
+      appBar: AppBar(title: const Text("Snapsafe")),
+      body: _isUnlocked
+          ? Column(
+              children: [
+                ElevatedButton(
+                  onPressed: _pickImage,
+                  child: Text("Pick an image"),
+                ),
+                Expanded(
+                  child: GridView.builder(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                    ),
+                    itemCount: _images.length,
+                    itemBuilder: (context, index) {
+                      return GestureDetector(
+                        onTap: () => _removeImage(index),
+                        child: Stack(
+                          children: [
+                            Image.file(_images[index], fit: BoxFit.cover),
+                            const Positioned(
+                              right: 5,
+                              top: 5,
+                              child: Icon(
+                                Icons.delete,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            )
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(labelText: 'Enter password'),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: _unlockAlbum,
+                    child: const Text('Unlock Album'),
+                  ),
+                ],
               ),
-              itemCount: _images.length,
-              itemBuilder: (context, index) {
-                return Image.file(_images[index]);
-              },
             ),
-          ),
-        ],
-      ),
     );
   }
 }

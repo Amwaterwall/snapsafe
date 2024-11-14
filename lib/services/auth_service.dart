@@ -1,19 +1,16 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
-  final StorageService _storageService = StorageService();
+  static const String _passwordKey = 'password_key';
 
   Future<void> setPassword(String password) async {
-    await _storageService.savePassword(password);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_passwordKey, password);
   }
 
   Future<String?> getPassword() async {
-    return await _storageService.getPassword();
-  }
-
-  Future<bool> authenticate(String enteredPassword) async {
-    final savedPassword = await getPassword();
-    return savedPassword == enteredPassword;
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_passwordKey);
   }
 }
 
