@@ -31,7 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_secure_storage: ^9.0.0
-  image_picker: ^0.8.5+3
+  image_picker: ^0.8.7+3
   path_provider: ^2.0.12
   shared_preferences: ^2.0.15
 
